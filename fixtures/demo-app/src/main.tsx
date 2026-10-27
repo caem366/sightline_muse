@@ -17,8 +17,8 @@ function App() {
       <div className="content"><p className="eyebrow">OVERVIEW / OCTOBER 2026</p><h1>{title}</h1>
       {route === '/settings' ? <>
         <p className="subhead">Manage your workspace preferences and account.</p>
-        <section className="panel settings-panel" data-sightline="settings-form"><div><h2>Workspace profile</h2><p>Keep the details your team sees up to date.</p></div>
-          <div className="settings-fields"><label>Workspace name<input defaultValue="Acme Studio"/></label><label>Contact email<input defaultValue="team@acme.studio"/></label></div>
+        <section className="panel settings-panel"><div><h2>Workspace profile</h2><p>Keep the details your team sees up to date.</p></div>
+          <div className="settings-fields" data-sightline="settings-form"><label>Workspace name<input defaultValue="Acme Studio"/></label><label>Contact email<input defaultValue="team@acme.studio"/></label></div>
           <button onClick={() => setSaved(true)}>{saved ? 'Saved' : 'Save changes'}</button>
         </section>
       </> : route === '/reports' ? <>

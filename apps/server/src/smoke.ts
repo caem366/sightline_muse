@@ -4,7 +4,7 @@ import { capture, openBrowser, startApp, stopApp } from './capture.js';
 import { applyProposal } from './patch.js';
 import { projects, repo } from './projects.js';
 import { command } from './util.js';
-import { difference } from './verify.js';
+import { boxDelta, difference } from './verify.js';
 import type { Proposal } from './types.js';
 
 const project=projects[0], dir=join(repo,'runs','smoke'), browser=await openBrowser();
@@ -30,12 +30,12 @@ try {
       app=await startApp(project,join(worktree,relative(repo,project.root)),5191+i);
       const afterTarget=await capture(browser,5191+i,target,join(dir,`candidate-${i}-images`));
       const afterProtected=await capture(browser,5191+i,protectedView,join(dir,`candidate-${i}-images`));
-      results.push({target:await difference(target.reference!,afterTarget.image,beforeTarget.landmark),protected:await difference(beforeProtected.image,afterProtected.image)});
+      results.push({target:await difference(target.reference!,afterTarget.image,beforeTarget.landmark),protected:await difference(beforeProtected.image,afterProtected.image),geometry:boxDelta(beforeProtected.landmark,afterProtected.landmark)});
     } finally {if(app)stopApp(app);await command(['git','worktree','remove','--force',worktree],repo);}
   }
   console.log(JSON.stringify({baseline:beforeDiff,shared:results[0],scoped:results[1]},null,2));
   assert(results[0].target<beforeDiff*.85,'shared token should improve target');
-  assert(results[0].protected>.01,'shared token should regress protected view');
+  assert(results[0].protected>.01||results[0].geometry>4,'shared token should regress protected view');
   assert(results[1].target<beforeDiff*.85,'scoped edit should improve target');
-  assert(results[1].protected<.01,'scoped edit should preserve protected view');
+  assert(results[1].protected<.01&&results[1].geometry<=4,'scoped edit should preserve protected view');
 } finally {if(baselineApp)stopApp(baselineApp);await browser.close();}
