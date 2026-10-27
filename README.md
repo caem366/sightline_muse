@@ -42,7 +42,7 @@ npm run smoke -w @sightline/server
 
 `npm test` mocks **only the model API** to exercise the full worktree, browser, patch, rejection, and retry loop. Its run record is marked `origin: test`; it is not evidence of a real Muse decision. `npm run smoke` supplies known CSS proposals to verify that the independent gate rejects a shared-token regression and accepts a scoped correction. A real Muse run requires a key and must be evaluated separately.
 
-Run evidence is saved under ignored `runs/<id>/`: screenshots, JSON event log and metrics, plus each candidate's unified diff. A rejected candidate is retained in the report but its worktree is removed. The UI never applies a candidate without an explicit click. The project is intended to be published as a **public repository** for submission; verify the accepted participant rules and identify these new contributions in the submission and demo.
+Run evidence is saved under ignored `runs/<id>/`: screenshots, JSON event log and metrics, plus each candidate's unified diff. A rejected candidate is retained in the report but its worktree is removed. The UI never applies a candidate without an explicit click. The accepted hackathon rules require a **public repository** and a demo that clearly identifies work created during the event. Publish this new repository and show only its verified, event-built features in the submission.
 
 ## Current limits
 
