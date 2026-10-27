@@ -1,0 +1,24 @@
+[
+  {
+    "id": "my-react-app",
+    "root": "C:/absolute/path/to/my-react-app",
+    "dev": ["npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "{port}", "--strictPort"],
+    "install": ["npm", "ci"],
+    "build": ["npm", "run", "build"],
+    "typecheck": ["npm", "run", "typecheck"],
+    "functional": ["npm", "run", "test:e2e", "--", "--base-url", "http://127.0.0.1:{port}"],
+    "allowedCss": ["src/style.css"],
+    "target": {
+      "id": "home-desktop",
+      "path": "/",
+      "width": 1440,
+      "height": 900,
+      "landmark": "main-grid",
+      "reference": "C:/absolute/path/to/reference.png"
+    },
+    "protected": [
+      {"id":"settings-desktop","path":"/settings","width":1440,"height":900,"landmark":"settings-form"},
+      {"id":"home-mobile","path":"/","width":390,"height":844,"landmark":"main-grid"}
+    ]
+  }
+]

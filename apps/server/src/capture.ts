@@ -6,8 +6,8 @@ import { repo } from './projects.js';
 import type { Capture, Project, View } from './types.js';
 
 export async function startApp(project: Project, root: string, port: number): Promise<ChildProcess> {
-  const args = project.dev.map(x => x === '5179' ? String(port) : x);
-  const isVite = args.slice(0,3).join(' ') === 'npm run dev';
+  const args = project.dev.map(x => x === '5179' ? String(port) : x.replace('{port}',String(port)));
+  const isVite = project.id==='northstar';
   const child = isVite
     ? spawn(process.execPath,[join(repo,'node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port',String(port),'--strictPort'],{cwd:root,windowsHide:true,stdio:'ignore'})
     : spawn(args[0],args.slice(1),{cwd:root,shell:process.platform==='win32',windowsHide:true,stdio:'ignore'});

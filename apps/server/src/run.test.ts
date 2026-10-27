@@ -8,6 +8,7 @@ import { projects } from './projects.js';
 test('rejects a shared regression and accepts a scoped repair without editing source', {timeout:180000}, async()=>{
   const originalFetch=global.fetch,originalKey=process.env.MODEL_API_KEY;
   process.env.MODEL_API_KEY='test-only';
+  process.env.SIGHTLINE_TEST_RUN='1';
   const cssPath=join(projects[0].root,'src/style.css'),source=await readFile(cssPath,'utf8');
   const proposals=[
     {file:'src/style.css',selector:':root',property:'--surface-gap',expectedValue:'12px',newValue:'24px',reason:'Shared spacing appears too tight',evidenceId:'dashboard-grid'},
@@ -28,5 +29,5 @@ test('rejects a shared regression and accepts a scoped repair without editing so
     assert.equal(result.candidates[1].verdict,'accepted');
     assert.equal(result.candidates[1].checks.functional,true);
     assert.equal(await readFile(cssPath,'utf8'),source);
-  } finally {global.fetch=originalFetch;if(originalKey===undefined) delete process.env.MODEL_API_KEY;else process.env.MODEL_API_KEY=originalKey;}
+  } finally {global.fetch=originalFetch;delete process.env.SIGHTLINE_TEST_RUN;if(originalKey===undefined) delete process.env.MODEL_API_KEY;else process.env.MODEL_API_KEY=originalKey;}
 });

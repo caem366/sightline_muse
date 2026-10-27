@@ -24,19 +24,30 @@ export async function loadRuns() {
 }
 async function record(run:Run,message:string) { run.events.push({at:new Date().toISOString(),message}); await save(join(runDir,run.id,'run.json'),JSON.stringify(run,null,2)); }
 function projectFor(id:string) {const project=projects.find(x=>x.id===id); if(!project) throw new Error('Unknown project');return project;}
+async function repositoryFor(project:Project) {
+  const repository=resolve(await command(['git','rev-parse','--show-toplevel'],project.root));
+  const appPath=relative(repository,project.root);
+  if(appPath.startsWith('..')||resolve(repository,appPath)!==resolve(project.root)) throw new Error('App root is outside its Git repository');
+  return repository;
+}
 async function captureMatrix(browser:Browser,port:number,views:View[],dir:string) {
   const results=new Map<string,Capture>();
   for(const view of views) results.set(view.id,await capture(browser,port,view,dir));
   return results;
 }
 async function checkScript(args:string[],root:string):Promise<boolean> {try {await command(args,root);return true;}catch{return false;}}
+async function checkFunctional(project:Project,browser:Browser,root:string,port:number) {
+  return project.id==='northstar' ? checkInteractions(browser,port) : checkScript(project.functional!.map(x=>x.replace('{port}',String(port))),root);
+}
 
 export async function launch(projectId:string):Promise<Run> {
   const project=projectFor(projectId);
-  const status=await command(['git','status','--porcelain','--untracked-files=no'],repo);
+  const repository=await repositoryFor(project);
+  const status=await command(['git','status','--porcelain','--untracked-files=no'],repository);
   if(status) throw new Error('Repository must be clean before a run');
-  const baseCommit=await command(['git','rev-parse','HEAD'],repo);
-  const run:Run={id:randomUUID(),projectId,state:'running',startedAt:new Date().toISOString(),baseCommit,events:[],candidates:[],model:{provider:'',id:'',calls:0,inputTokens:0,outputTokens:0,costUsd:0,latencyMs:[]}};
+  for(const css of project.allowedCss) await command(['git','ls-files','--error-unmatch',relative(repository,join(project.root,css))],repository);
+  const baseCommit=await command(['git','rev-parse','HEAD'],repository);
+  const run:Run={id:randomUUID(),projectId,repository,origin:process.env.SIGHTLINE_TEST_RUN?'test':'live',state:'running',startedAt:new Date().toISOString(),baseCommit,events:[],candidates:[],model:{provider:'',id:'',calls:0,inputTokens:0,outputTokens:0,costUsd:0,latencyMs:[]}};
   runs.set(run.id,run);
   void execute(run,project).catch(async error=>{run.state='failed';run.error=error instanceof Error?error.message:String(error);run.endedAt=new Date().toISOString();await record(run,`Failed: ${run.error}`);});
   return run;
@@ -56,7 +67,7 @@ async function execute(run:Run,project:Project) {
       if(drift>.001 || boxDelta(a.landmark,b.landmark)>1) throw new Error(`Unstable baseline ${view.id}: ${(drift*100).toFixed(2)}% changed`);
       if(a.errors.length) throw new Error(`Baseline errors on ${view.id}: ${a.errors.join('; ')}`);
     }
-    if(!await checkInteractions(browser,5179)) throw new Error('Baseline functional interactions failed');
+    if(!await checkFunctional(project,browser,project.root,5179)) throw new Error('Baseline functional interactions failed');
     if(!project.target.reference) throw new Error('Target reference missing');
     const reference=project.target.reference;
     await readFile(reference);
@@ -66,17 +77,18 @@ async function execute(run:Run,project:Project) {
     stopApp(app); app=undefined;
     let feedback='';
     for(let attempt=0;attempt<2;attempt++) {
-      const css=await readFile(join(project.root,project.allowedCss[0]),'utf8');
+      const css=(await Promise.all(project.allowedCss.map(async file=>`${file}\n${await readFile(join(project.root,file),'utf8')}`))).join('\n\n');
       const proposal=await propose(run,reference,baseTarget,css,project.allowedCss,feedback||undefined);
       await record(run,`Muse proposed ${proposal.selector} ${proposal.property}: ${proposal.expectedValue} → ${proposal.newValue}`);
       const worktree=join(dir,`candidate-${attempt+1}`);
-      await command(['git','worktree','add','--detach',worktree,run.baseCommit],repo);
+      await command(['git','worktree','add','--detach',worktree,run.baseCommit],run.repository);
       let candidateApp:ChildProcess|undefined,diff='';
       try {
-        const appRoot=join(worktree,relative(repo,project.root));
+        const appRoot=join(worktree,relative(run.repository,project.root));
+        if(project.install) await command(project.install,appRoot,180000);
         await applyProposal(appRoot,project.allowedCss,proposal);
         const changed=(await command(['git','diff','--name-only'],worktree)).split(/\r?\n/).filter(Boolean);
-        const allowed=project.allowedCss.map(x=>relative(repo,join(project.root,x)).replaceAll('\\','/'));
+        const allowed=project.allowedCss.map(x=>relative(run.repository,join(project.root,x)).replaceAll('\\','/'));
         if(changed.length!==1 || !allowed.includes(changed[0].replaceAll('\\','/'))) throw new Error('Changed files exceed allowlist');
         diff=await command(['git','diff','--',...changed],worktree);
         if(diff.length>10000) throw new Error('Patch exceeds diff size limit');
@@ -91,7 +103,7 @@ async function execute(run:Run,project:Project) {
           const original=before.get(view.id)!,current=after.get(view.id)!;
           protectedChecks.push({id:view.id,changedRatio:await difference(original.image,current.image),landmarkDelta:boxDelta(original.landmark,current.landmark),overflow:current.overflow&&!original.overflow,errors:current.errors.slice(original.errors.length)});
         }
-        const functional=await checkInteractions(browser,5180+attempt);
+        const functional=await checkFunctional(project,browser,appRoot,5180+attempt);
         const reasons=checkCandidate(baseTarget,targetAfter,baseTargetDiff,targetDiff,protectedChecks,build,typecheck,functional);
         const candidate:Candidate={proposal,diff,targetBefore:baseTargetDiff,targetAfter:targetDiff,protected:protectedChecks,checks:{build,typecheck,functional},verdict:reasons.length?'rejected':'accepted',reasons,artifacts:{reference:relative(dir,reference),before:relative(dir,baseTarget.image),after:relative(dir,targetAfter.image)}};
         run.candidates.push(candidate); await save(join(dir,`candidate-${attempt+1}.diff`),diff); await record(run,`Candidate ${attempt+1} ${candidate.verdict}: ${reasons.join(', ')||'all gates passed'}`);
@@ -104,7 +116,7 @@ async function execute(run:Run,project:Project) {
         feedback=`The previous proposal failed: ${reason}. Propose a scoped declaration using existing CSS.`;
       } finally {
         if(candidateApp) stopApp(candidateApp);
-        await command(['git','worktree','remove','--force',worktree],repo).catch(()=>{});
+        await command(['git','worktree','remove','--force',worktree],run.repository).catch(()=>{});
       }
     }
     run.state='failed';run.endedAt=new Date().toISOString();await record(run,'No candidate passed verification');
@@ -114,10 +126,11 @@ async function execute(run:Run,project:Project) {
 export async function accept(id:string) {
   const run=getRun(id);
   if(run.state!=='review') throw new Error('Run has no accepted candidate');
-  if(await command(['git','rev-parse','HEAD'],repo)!==run.baseCommit) throw new Error('Repository HEAD changed since run');
-  if(await command(['git','status','--porcelain','--untracked-files=no'],repo)) throw new Error('Repository is no longer clean');
+  const repository=run.repository||await repositoryFor(projectFor(run.projectId));
+  if(await command(['git','rev-parse','HEAD'],repository)!==run.baseCommit) throw new Error('Repository HEAD changed since run');
+  if(await command(['git','status','--porcelain','--untracked-files=no'],repository)) throw new Error('Repository is no longer clean');
   const patch=join(runDir,id,`candidate-${run.candidates.length}.diff`);
-  await command(['git','apply','--check',patch],repo);
-  await command(['git','apply',patch],repo);
+  await command(['git','apply','--check',patch],repository);
+  await command(['git','apply',patch],repository);
   run.state='applied'; await record(run,'Patch applied to source checkout');return run;
 }
