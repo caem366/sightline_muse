@@ -41,7 +41,7 @@ h2 { font-size: 17px; margin: 0; }
 .activity-row b { font-size: 14px; }
 .activity-row small { display: block; color: #8a96a9; margin-top: 5px; font-size: 12px; }
 .status { margin-left: auto; color: #527cbd; background: #eef4ff; border-radius: 20px; padding: 7px 10px; font-size: 11px; }
-.settings-panel { max-width: 720px; padding: calc(var(--surface-gap) * 2); }
+.settings-panel { max-width: 720px; padding: calc(var(--surface-gap) * 3); }
 .settings-panel p { color: #7e8aa0; font-size: 13px; margin-bottom: 28px; }
 .settings-fields { display: grid; grid-template-columns: repeat(2, minmax(204px,1fr)); gap: var(--surface-gap); }
 .settings-fields label { display: grid; gap: 9px; font-size: 12px; font-weight: 700; }
