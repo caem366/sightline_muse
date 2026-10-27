@@ -11,9 +11,9 @@ export async function propose(run:Run, reference:string, actual:Capture, css:str
   if (run.model.calls>=4 || run.model.costUsd>=2) throw new Error('Model call or cost budget exhausted');
   const images=await Promise.all([reference,actual.image].map(async path=>`data:image/png;base64,${(await readFile(path)).toString('base64')}`));
   const instructions = feedback
-    ? `The prior CSS candidate was rejected: ${feedback}. Propose one narrower, route-scoped CSS declaration edit that fixes the target without changing protected routes.`
+    ? `The prior CSS candidate was rejected: ${feedback}. Correct the exact source-value mismatch if validation failed. If protected views regressed, propose a route-scoped declaration. Return one valid edit.`
     : 'Compare the reference and actual screenshots. Find the most important layout discrepancy and propose one grounded CSS declaration edit.';
-  const payload={model,messages:[{role:'system',content:'You are SIGHTLINE, a visual engineering agent. Return exactly one grounded CSS declaration change using the supplied CSS and DOM evidence. Never invent a selector, value, or file. Do not edit JSX or add CSS rules. Keep the change minimal.'},{role:'user',content:[{type:'text',text:`${instructions}\nAllowed CSS: ${allowedCss.join(', ')}\nDOM evidence: ${JSON.stringify(actual.elements)}\nCSS source:\n${css}\nFirst image: design reference.`},{type:'image_url',image_url:{url:images[0]}},{type:'text',text:'Second image: current app render.'},{type:'image_url',image_url:{url:images[1]}}]}],response_format:schema,max_tokens:1800,reasoning_effort:'medium'};
+  const payload={model,messages:[{role:'system',content:'You are SIGHTLINE, a visual engineering agent. Return exactly one grounded CSS declaration change using the supplied CSS and DOM evidence. The file, selector, property, and expectedValue must exactly match one declaration in the supplied CSS source. expectedValue is the current source value, never the desired value or a computed value. newValue must differ. Never invent a selector or file. Do not edit JSX or add CSS rules.'},{role:'user',content:[{type:'text',text:`${instructions}\nAllowed CSS: ${allowedCss.join(', ')}\nDOM evidence: ${JSON.stringify(actual.elements)}\nCSS source:\n${css}\nFirst image: design reference.`},{type:'image_url',image_url:{url:images[0]}},{type:'text',text:'Second image: current app render.'},{type:'image_url',image_url:{url:images[1]}}]}],response_format:schema,max_tokens:3000,reasoning_effort:'low'};
   const start=Date.now();
   const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),90000);
   let response:Response;
@@ -25,7 +25,7 @@ export async function propose(run:Run, reference:string, actual:Capture, css:str
   const rates=provider==='meta' ? [1.25,4.25] : [1.25,4.25];
   run.model.costUsd=(run.model.inputTokens*rates[0]+run.model.outputTokens*rates[1])/1e6;
   const content=body.choices?.[0]?.message?.content;
-  if (!content) throw new Error('Muse returned no proposal');
+  if (!content) throw new Error(`Muse returned no proposal (finish_reason: ${body.choices?.[0]?.finish_reason||'unknown'})`);
   const proposal=JSON.parse(content) as Proposal;
   for (const field of ['file','selector','property','expectedValue','newValue','reason','evidenceId'] as const) if(typeof proposal[field]!=='string'||!proposal[field]) throw new Error(`Invalid proposal field ${field}`);
   if (!actual.elements.some(x=>x.id===proposal.evidenceId)) throw new Error('Proposal cites unknown DOM evidence');

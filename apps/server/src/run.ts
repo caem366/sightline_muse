@@ -5,7 +5,7 @@ import type { ChildProcess } from 'node:child_process';
 import type { Browser } from 'playwright';
 import { capture, checkInteractions, openBrowser, startApp, stopApp } from './capture.js';
 import { propose } from './model.js';
-import { applyProposal } from './patch.js';
+import { applyProposal, validateProposal } from './patch.js';
 import { projects, repo } from './projects.js';
 import type { Candidate, Capture, Project, Run, View } from './types.js';
 import { command, save } from './util.js';
@@ -81,9 +81,12 @@ async function execute(run:Run,project:Project) {
       const proposal=await propose(run,reference,baseTarget,css,project.allowedCss,feedback||undefined);
       await record(run,`Muse proposed ${proposal.selector} ${proposal.property}: ${proposal.expectedValue} → ${proposal.newValue}`);
       const worktree=join(dir,`candidate-${attempt+1}`);
-      await command(['git','worktree','add','--detach',worktree,run.baseCommit],run.repository);
       let candidateApp:ChildProcess|undefined,diff='';
+      let worktreeAdded=false;
       try {
+        await validateProposal(project.root,project.allowedCss,proposal);
+        await command(['git','worktree','add','--detach',worktree,run.baseCommit],run.repository);
+        worktreeAdded=true;
         const appRoot=join(worktree,relative(run.repository,project.root));
         if(project.install) await command(project.install,appRoot,180000);
         await applyProposal(appRoot,project.allowedCss,proposal);
@@ -113,10 +116,10 @@ async function execute(run:Run,project:Project) {
         const reason=error instanceof Error?error.message:String(error);
         run.candidates.push({proposal,diff,targetBefore:baseTargetDiff,targetAfter:baseTargetDiff,protected:[],checks:{},verdict:'rejected',reasons:[reason],artifacts:{}});
         await record(run,`Candidate ${attempt+1} rejected: ${reason}`);
-        feedback=`The previous proposal failed: ${reason}. Propose a scoped declaration using existing CSS.`;
+        feedback=`The previous proposal failed validation or execution: ${reason}. Use the exact current declaration value shown in the CSS source.`;
       } finally {
         if(candidateApp) stopApp(candidateApp);
-        await command(['git','worktree','remove','--force',worktree],run.repository).catch(()=>{});
+        if(worktreeAdded) await command(['git','worktree','remove','--force',worktree],run.repository).catch(()=>{});
       }
     }
     run.state='failed';run.endedAt=new Date().toISOString();await record(run,'No candidate passed verification');
