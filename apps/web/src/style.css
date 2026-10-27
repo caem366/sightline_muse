@@ -21,10 +21,18 @@ header p { margin:0; color:#8d9caf; font-size:13px; }
 .setup div { display:flex; flex-direction:column; gap:6px; min-width:0; }
 .setup label { color:#72849b; }
 .setup strong { font-size:14px; }
+.setup select { color:#e7ecf4; background:transparent; border:0; border-bottom:1px solid #3b5069; padding:4px 0; width:100%; font-weight:700; }
+.setup select option { color:#0a0f19; }
 .setup small { color:#718197; font-size:11px; }
+.setup .upload { color:#8adcc6; cursor:pointer; font-size:9px; margin-top:5px; }
+.upload input { display:none; }
 .setup button,.accept { background:#8adcc6; border:0; color:#0c261f; font-size:11px; letter-spacing:.5px; font-weight:900; padding:15px 20px; border-radius:8px; white-space:nowrap; }
 .setup button:disabled,.accept:disabled { opacity:.5; cursor:default; }
 .alert { margin:16px 0; padding:13px 16px; background:#40212b; border:1px solid #a25067; border-radius:8px; color:#ffbecd; font-size:13px; }
+.candidate-tabs { display:flex; gap:8px; margin-top:22px; }
+.candidate-tabs button { background:#111b2a; border:1px solid #26384d; border-radius:7px; padding:10px 14px; color:#94a7bb; font-size:10px; font-weight:800; cursor:pointer; }
+.candidate-tabs button.active { border-color:#83d8c4; color:#e8fff7; }
+.candidate-tabs em { margin-left:8px; }
 .main-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(340px,.85fr); gap:36px; margin-top:36px; }
 .section-title { display:flex; justify-content:space-between; align-items:end; margin-bottom:17px; }
 .section-title h2 { margin:6px 0 0; font-size:17px; letter-spacing:-.3px; }
@@ -32,6 +40,8 @@ header p { margin:0; color:#8d9caf; font-size:13px; }
 .state.review,.state.applied { color:#82d9b6; border-color:#36765c; }
 .state.failed { color:#ff9da9; border-color:#8c4451; }
 .compare { position:relative; width:100%; aspect-ratio: 1440/900; overflow:hidden; background:#f5f7fa; border:1px solid #2b3c50; border-radius:9px; }
+.reference-link { color:#71849b; font-size:10px; letter-spacing:1px; margin:-4px 0 10px; }
+.reference-link a { color:#8adcc6; float:right; text-decoration:none; }
 .compare img { width:100%; height:100%; object-fit:fill; display:block; }
 .compare .after { position:absolute; inset:0; }
 .divider { position:absolute; top:0; bottom:0; width:2px; background:#8adcc6; box-shadow:0 0 15px #093; }

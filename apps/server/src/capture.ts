@@ -43,3 +43,17 @@ export async function capture(browser: Browser, port:number, view:View, artifact
   } finally { await context.close(); }
 }
 export async function openBrowser() { return chromium.launch({headless:true}); }
+export async function checkInteractions(browser:Browser,port:number):Promise<boolean> {
+  const context=await browser.newContext({viewport:{width:1440,height:900}});
+  const page=await context.newPage();
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`,{waitUntil:'networkidle'});
+    await page.getByRole('button',{name:'View all'}).click();
+    if(!await page.getByRole('button',{name:'Showing all'}).isVisible()) return false;
+    await page.getByRole('link',{name:/Settings/}).click();
+    await page.getByRole('button',{name:'Save changes'}).click();
+    if(!await page.getByRole('button',{name:'Saved'}).isVisible()) return false;
+    await page.getByRole('link',{name:/Reports/}).click();
+    return await page.getByRole('heading',{name:'Monthly performance'}).isVisible();
+  } catch {return false;} finally {await context.close();}
+}

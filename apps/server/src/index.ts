@@ -2,11 +2,14 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
-import { accept, getRun, launch, runDir } from './run.js';
+import { PNG } from 'pngjs';
+import { accept, getRun, launch, loadRuns, runDir, runs } from './run.js';
 import { projects } from './projects.js';
+import { save } from './util.js';
 
 const app=express(); app.use(express.json({limit:'12mb'}));
 app.get('/api/projects',(_req,res)=>res.json(projects.map(({id,target,protected:checks})=>({id,target,protected:checks}))));
+app.get('/api/runs',(_req,res)=>res.json([...runs.values()].sort((a,b)=>b.startedAt.localeCompare(a.startedAt)).slice(0,20)));
 app.post('/api/runs',async(req,res)=>{try {res.status(202).json(await launch(req.body.projectId));}catch(error){res.status(400).json({error:String(error)});}});
 app.get('/api/runs/:id',(req,res)=>{try{res.json(getRun(req.params.id));}catch(error){res.status(404).json({error:String(error)});}});
 app.get('/api/runs/:id/events',(req,res)=>{
@@ -29,5 +32,17 @@ app.get('/api/projects/:id/reference',async(req,res)=>{
   try {const project=projects.find(x=>x.id===req.params.id);if(!project?.target.reference) throw new Error('Reference missing');res.type('png').send(await readFile(project.target.reference));}
   catch(error){res.status(404).json({error:String(error)});}
 });
+app.post('/api/projects/:id/reference',async(req,res)=>{
+  try {
+    const project=projects.find(x=>x.id===req.params.id);if(!project) throw new Error('Unknown project');
+    if(typeof req.body.pngBase64!=='string'||req.body.pngBase64.length>8_000_000) throw new Error('Invalid PNG payload');
+    const data=Buffer.from(req.body.pngBase64,'base64'),image=PNG.sync.read(data);
+    if(image.width!==project.target.width||image.height!==project.target.height) throw new Error('Reference dimensions must match target viewport');
+    const path=join(runDir,'references',`${project.id}.png`);await save(path,data);project.target.reference=path;
+    res.json({ok:true});
+  } catch(error){res.status(400).json({error:String(error)});}
+});
 app.post('/api/runs/:id/accept',async(req,res)=>{try{res.json(await accept(req.params.id));}catch(error){res.status(400).json({error:String(error)});}});
+await loadRuns();
+for(const project of projects) {const uploaded=join(runDir,'references',`${project.id}.png`);if(existsSync(uploaded)) project.target.reference=uploaded;}
 app.listen(4177,'127.0.0.1',()=>console.log('SIGHTLINE API on http://127.0.0.1:4177'));

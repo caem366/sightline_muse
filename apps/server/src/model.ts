@@ -3,7 +3,7 @@ import type { Capture, Proposal, Run } from './types.js';
 
 const schema = {type:'json_schema',json_schema:{name:'css_repair',strict:true,schema:{type:'object',additionalProperties:false,properties:{file:{type:'string'},selector:{type:'string'},property:{type:'string'},expectedValue:{type:'string'},newValue:{type:'string'},reason:{type:'string'},evidenceId:{type:'string'}},required:['file','selector','property','expectedValue','newValue','reason','evidenceId']}}};
 export async function propose(run:Run, reference:string, actual:Capture, css:string, allowedCss:string[], feedback?:string):Promise<Proposal> {
-  const provider=process.env.MODEL_API_KEY ? 'meta' : process.env.BASETEN_API_KEY ? 'baseten' : '';
+  const provider=process.env.SIGHTLINE_PROVIDER==='baseten' ? (process.env.BASETEN_API_KEY?'baseten':'') : process.env.MODEL_API_KEY ? 'meta' : process.env.BASETEN_API_KEY ? 'baseten' : '';
   if (!provider) throw new Error('Set MODEL_API_KEY or BASETEN_API_KEY for a real Muse proposal');
   const model=provider==='meta' ? 'muse-spark-1.3' : process.env.BASETEN_MODEL_ID || 'meta-models/muse-spark-open-1026';
   const base=provider==='meta' ? 'https://api.meta.ai/v1' : 'https://inference.baseten.co/v1';

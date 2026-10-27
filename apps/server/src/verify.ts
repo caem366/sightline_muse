@@ -14,13 +14,14 @@ export async function difference(aPath:string,bPath:string,box?:Box):Promise<num
   return pixelmatch(crop(a).data,crop(b).data,undefined,width,height,{threshold:.12})/(width*height);
 }
 export function boxDelta(a?:Box,b?:Box) { if(!a||!b) return Infinity;return Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y),Math.abs(a.width-b.width),Math.abs(a.height-b.height)); }
-export function checkCandidate(before:Capture,after:Capture,reference:string,baseTargetDiff:number,targetDiff:number,protectedChecks:{changedRatio:number;landmarkDelta:number;overflow:boolean;errors:string[]}[],build:boolean,typecheck:boolean) {
+export function checkCandidate(before:Capture,after:Capture,baseTargetDiff:number,targetDiff:number,protectedChecks:{changedRatio:number;landmarkDelta:number;overflow:boolean;errors:string[]}[],build:boolean,typecheck:boolean,functional:boolean) {
   const reasons:string[]=[];
   if(!Number.isFinite(baseTargetDiff)||baseTargetDiff<=0) reasons.push('Target baseline has no measurable defect');
   else if(targetDiff>baseTargetDiff*.85) reasons.push('Target did not improve by 15%');
   if(after.errors.length>before.errors.length) reasons.push('New runtime errors');
   if(after.overflow&&!before.overflow) reasons.push('New target overflow');
   if(!build) reasons.push('Build failed'); if(!typecheck) reasons.push('Typecheck failed');
+  if(!functional) reasons.push('Functional interactions failed');
   for(const check of protectedChecks) if(check.changedRatio>.01||check.landmarkDelta>4||check.overflow||check.errors.length) reasons.push('Protected view regressed');
   return [...new Set(reasons)];
 }

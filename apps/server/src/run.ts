@@ -3,7 +3,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import type { ChildProcess } from 'node:child_process';
 import type { Browser } from 'playwright';
-import { capture, openBrowser, startApp, stopApp } from './capture.js';
+import { capture, checkInteractions, openBrowser, startApp, stopApp } from './capture.js';
 import { propose } from './model.js';
 import { applyProposal } from './patch.js';
 import { projects, repo } from './projects.js';
@@ -14,6 +14,14 @@ import { boxDelta, checkCandidate, difference } from './verify.js';
 export const runs = new Map<string,Run>();
 export const runDir = resolve(repo,'runs');
 export function getRun(id:string) { const run=runs.get(id); if(!run) throw new Error('Run not found'); return run; }
+export async function loadRuns() {
+  for(const id of await readdir(runDir).catch(()=>[])) {
+    try {const run=JSON.parse(await readFile(join(runDir,id,'run.json'),'utf8')) as Run;
+      if(run.state==='running'){run.state='failed';run.error='Server restarted during run';run.endedAt=new Date().toISOString();await save(join(runDir,id,'run.json'),JSON.stringify(run,null,2));}
+      runs.set(id,run);
+    } catch {}
+  }
+}
 async function record(run:Run,message:string) { run.events.push({at:new Date().toISOString(),message}); await save(join(runDir,run.id,'run.json'),JSON.stringify(run,null,2)); }
 function projectFor(id:string) {const project=projects.find(x=>x.id===id); if(!project) throw new Error('Unknown project');return project;}
 async function captureMatrix(browser:Browser,port:number,views:View[],dir:string) {
@@ -25,7 +33,7 @@ async function checkScript(args:string[],root:string):Promise<boolean> {try {awa
 
 export async function launch(projectId:string):Promise<Run> {
   const project=projectFor(projectId);
-  const status=await command(['git','status','--porcelain'],repo);
+  const status=await command(['git','status','--porcelain','--untracked-files=no'],repo);
   if(status) throw new Error('Repository must be clean before a run');
   const baseCommit=await command(['git','rev-parse','HEAD'],repo);
   const run:Run={id:randomUUID(),projectId,state:'running',startedAt:new Date().toISOString(),baseCommit,events:[],candidates:[],model:{provider:'',id:'',calls:0,inputTokens:0,outputTokens:0,costUsd:0,latencyMs:[]}};
@@ -48,6 +56,7 @@ async function execute(run:Run,project:Project) {
       if(drift>.001 || boxDelta(a.landmark,b.landmark)>1) throw new Error(`Unstable baseline ${view.id}: ${(drift*100).toFixed(2)}% changed`);
       if(a.errors.length) throw new Error(`Baseline errors on ${view.id}: ${a.errors.join('; ')}`);
     }
+    if(!await checkInteractions(browser,5179)) throw new Error('Baseline functional interactions failed');
     if(!project.target.reference) throw new Error('Target reference missing');
     const reference=project.target.reference;
     await readFile(reference);
@@ -62,14 +71,14 @@ async function execute(run:Run,project:Project) {
       await record(run,`Muse proposed ${proposal.selector} ${proposal.property}: ${proposal.expectedValue} → ${proposal.newValue}`);
       const worktree=join(dir,`candidate-${attempt+1}`);
       await command(['git','worktree','add','--detach',worktree,run.baseCommit],repo);
-      let candidateApp:ChildProcess|undefined;
+      let candidateApp:ChildProcess|undefined,diff='';
       try {
         const appRoot=join(worktree,relative(repo,project.root));
         await applyProposal(appRoot,project.allowedCss,proposal);
         const changed=(await command(['git','diff','--name-only'],worktree)).split(/\r?\n/).filter(Boolean);
         const allowed=project.allowedCss.map(x=>relative(repo,join(project.root,x)).replaceAll('\\','/'));
         if(changed.length!==1 || !allowed.includes(changed[0].replaceAll('\\','/'))) throw new Error('Changed files exceed allowlist');
-        const diff=await command(['git','diff','--',...changed],worktree);
+        diff=await command(['git','diff','--',...changed],worktree);
         if(diff.length>10000) throw new Error('Patch exceeds diff size limit');
         const build=await checkScript(project.build,appRoot),typecheck=await checkScript(project.typecheck,appRoot);
         if(!build||!typecheck) await record(run,'Candidate failed build or typecheck');
@@ -82,11 +91,17 @@ async function execute(run:Run,project:Project) {
           const original=before.get(view.id)!,current=after.get(view.id)!;
           protectedChecks.push({id:view.id,changedRatio:await difference(original.image,current.image),landmarkDelta:boxDelta(original.landmark,current.landmark),overflow:current.overflow&&!original.overflow,errors:current.errors.slice(original.errors.length)});
         }
-        const reasons=checkCandidate(baseTarget,targetAfter,reference,baseTargetDiff,targetDiff,protectedChecks,build,typecheck);
-        const candidate:Candidate={proposal,diff,targetBefore:baseTargetDiff,targetAfter:targetDiff,protected:protectedChecks,checks:{build,typecheck},verdict:reasons.length?'rejected':'accepted',reasons,artifacts:{reference:relative(dir,reference),before:relative(dir,baseTarget.image),after:relative(dir,targetAfter.image)}};
+        const functional=await checkInteractions(browser,5180+attempt);
+        const reasons=checkCandidate(baseTarget,targetAfter,baseTargetDiff,targetDiff,protectedChecks,build,typecheck,functional);
+        const candidate:Candidate={proposal,diff,targetBefore:baseTargetDiff,targetAfter:targetDiff,protected:protectedChecks,checks:{build,typecheck,functional},verdict:reasons.length?'rejected':'accepted',reasons,artifacts:{reference:relative(dir,reference),before:relative(dir,baseTarget.image),after:relative(dir,targetAfter.image)}};
         run.candidates.push(candidate); await save(join(dir,`candidate-${attempt+1}.diff`),diff); await record(run,`Candidate ${attempt+1} ${candidate.verdict}: ${reasons.join(', ')||'all gates passed'}`);
         if(!reasons.length) {run.state='review';run.endedAt=new Date().toISOString();await record(run,'Ready for human review');return;}
         feedback=`${reasons.join('; ')}. Protected matrix: ${JSON.stringify(protectedChecks)}. Prior proposal: ${JSON.stringify(proposal)}`;
+      } catch(error) {
+        const reason=error instanceof Error?error.message:String(error);
+        run.candidates.push({proposal,diff,targetBefore:baseTargetDiff,targetAfter:baseTargetDiff,protected:[],checks:{},verdict:'rejected',reasons:[reason],artifacts:{}});
+        await record(run,`Candidate ${attempt+1} rejected: ${reason}`);
+        feedback=`The previous proposal failed: ${reason}. Propose a scoped declaration using existing CSS.`;
       } finally {
         if(candidateApp) stopApp(candidateApp);
         await command(['git','worktree','remove','--force',worktree],repo).catch(()=>{});
@@ -100,7 +115,7 @@ export async function accept(id:string) {
   const run=getRun(id);
   if(run.state!=='review') throw new Error('Run has no accepted candidate');
   if(await command(['git','rev-parse','HEAD'],repo)!==run.baseCommit) throw new Error('Repository HEAD changed since run');
-  if(await command(['git','status','--porcelain'],repo)) throw new Error('Repository is no longer clean');
+  if(await command(['git','status','--porcelain','--untracked-files=no'],repo)) throw new Error('Repository is no longer clean');
   const patch=join(runDir,id,`candidate-${run.candidates.length}.diff`);
   await command(['git','apply','--check',patch],repo);
   await command(['git','apply',patch],repo);
