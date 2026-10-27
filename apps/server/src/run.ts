@@ -130,10 +130,17 @@ export async function accept(id:string) {
   const run=getRun(id);
   if(run.state!=='review') throw new Error('Run has no accepted candidate');
   const repository=run.repository||await repositoryFor(projectFor(run.projectId));
-  if(await command(['git','rev-parse','HEAD'],repository)!==run.baseCommit) throw new Error('Repository HEAD changed since run');
   if(await command(['git','status','--porcelain','--untracked-files=no'],repository)) throw new Error('Repository is no longer clean');
+  const project=projectFor(run.projectId),proposal=run.candidates.at(-1)?.proposal;
+  if(!proposal||!project.allowedCss.includes(proposal.file)) throw new Error('Accepted CSS file is not allowed');
+  const file=relative(repository,join(project.root,proposal.file)).replaceAll('\\','/');
+  await assertSourceUnchanged(repository,run.baseCommit,file);
   const patch=join(runDir,id,`candidate-${run.candidates.length}.diff`);
   await command(['git','apply','--check',patch],repository);
   await command(['git','apply',patch],repository);
   run.state='applied'; await record(run,'Patch applied to source checkout');return run;
+}
+export async function assertSourceUnchanged(repository:string,baseCommit:string,file:string) {
+  await command(['git','merge-base','--is-ancestor',baseCommit,'HEAD'],repository).catch(()=>{throw new Error('Repository history changed since run');});
+  if(await command(['git','rev-parse',`${baseCommit}:${file}`],repository)!==await command(['git','rev-parse',`HEAD:${file}`],repository)) throw new Error('Reviewed CSS file changed since run');
 }
