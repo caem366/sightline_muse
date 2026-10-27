@@ -13,6 +13,6 @@ test('CSS edits require an exact, allowed declaration',async()=>{
   const proposal={file:'src/style.css',selector:':root',property:'--gap',expectedValue:'12px',newValue:'24px',reason:'test',evidenceId:'card'};
   await applyProposal(root,['src/style.css'],proposal);
   assert.match(await readFile(file,'utf8'),/--gap: 24px/);
-  await assert.rejects(applyProposal(root,['src/style.css'],proposal),/Expected value mismatch/);
+  await assert.rejects(applyProposal(root,['src/style.css'],proposal),/Expected exactly one/);
   await assert.rejects(applyProposal(root,['src/style.css'],{...proposal,file:'../escape.css'}),/Invalid relative path/);
 });

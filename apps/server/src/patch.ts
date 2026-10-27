@@ -13,9 +13,9 @@ export async function applyProposal(root:string, allowedCss:string[], proposal:P
   if(source.length>100000) throw new Error('CSS file too large');
   const css=postcss.parse(source,{from:absolute});
   const matches:postcss.Declaration[]=[];
-  css.walkRules(rule=>{if(rule.selector===proposal.selector) rule.walkDecls(proposal.property,decl=>{matches.push(decl);});});
+  css.walkRules(rule=>{if(rule.selector===proposal.selector) rule.walkDecls(proposal.property,decl=>{if(decl.value===proposal.expectedValue) matches.push(decl);});});
   if(matches.length!==1) throw new Error(`Expected exactly one ${proposal.selector} ${proposal.property} declaration, found ${matches.length}`);
-  if(matches[0].value!==proposal.expectedValue || proposal.newValue===proposal.expectedValue) throw new Error('Expected value mismatch or no-op');
+  if(proposal.newValue===proposal.expectedValue) throw new Error('No-op proposal');
   if(proposal.newValue.length>80 || /[{};]/.test(proposal.newValue)) throw new Error('Invalid CSS value');
   matches[0].value=proposal.newValue;
   const updated=css.toString();

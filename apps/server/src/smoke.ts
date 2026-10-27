@@ -33,9 +33,9 @@ try {
       results.push({target:await difference(target.reference!,afterTarget.image,beforeTarget.landmark),protected:await difference(beforeProtected.image,afterProtected.image)});
     } finally {if(app)stopApp(app);await command(['git','worktree','remove','--force',worktree],repo);}
   }
+  console.log(JSON.stringify({baseline:beforeDiff,shared:results[0],scoped:results[1]},null,2));
   assert(results[0].target<beforeDiff*.85,'shared token should improve target');
   assert(results[0].protected>.01,'shared token should regress protected view');
   assert(results[1].target<beforeDiff*.85,'scoped edit should improve target');
   assert(results[1].protected<.01,'scoped edit should preserve protected view');
-  console.log(JSON.stringify({baseline:beforeDiff,shared:results[0],scoped:results[1]},null,2));
 } finally {if(baselineApp)stopApp(baselineApp);await browser.close();}
