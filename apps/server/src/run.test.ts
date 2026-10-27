@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { getRun, launch } from './run.js';
-import { projects } from './projects.js';
+import { getRun, launch, runDir } from './run.js';
+import { projects, repo } from './projects.js';
+import { command } from './util.js';
 
 test('rejects a shared regression and accepts a scoped repair without editing source', {timeout:180000}, async()=>{
   const originalFetch=global.fetch,originalKey=process.env.MODEL_API_KEY;
@@ -28,6 +29,7 @@ test('rejects a shared regression and accepts a scoped repair without editing so
     assert(result.candidates[0].protected.some(x=>x.landmarkDelta>4));
     assert.equal(result.candidates[1].verdict,'accepted');
     assert.equal(result.candidates[1].checks.functional,true);
+    await command(['git','apply','--check',join(runDir,result.id,'candidate-2.diff')],repo);
     assert.equal(await readFile(cssPath,'utf8'),source);
   } finally {global.fetch=originalFetch;delete process.env.SIGHTLINE_TEST_RUN;if(originalKey===undefined) delete process.env.MODEL_API_KEY;else process.env.MODEL_API_KEY=originalKey;}
 });

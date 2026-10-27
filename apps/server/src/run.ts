@@ -93,7 +93,7 @@ async function execute(run:Run,project:Project) {
         const changed=(await command(['git','diff','--name-only'],worktree)).split(/\r?\n/).filter(Boolean);
         const allowed=project.allowedCss.map(x=>relative(run.repository,join(project.root,x)).replaceAll('\\','/'));
         if(changed.length!==1 || !allowed.includes(changed[0].replaceAll('\\','/'))) throw new Error('Changed files exceed allowlist');
-        diff=await command(['git','diff','--',...changed],worktree);
+        diff=(await command(['git','diff','--',...changed],worktree))+'\n';
         if(diff.length>10000) throw new Error('Patch exceeds diff size limit');
         const build=await checkScript(project.build,appRoot),typecheck=await checkScript(project.typecheck,appRoot);
         if(!build||!typecheck) await record(run,'Candidate failed build or typecheck');
