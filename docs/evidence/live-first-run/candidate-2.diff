@@ -1,0 +1,13 @@
+diff --git a/fixtures/demo-app/src/style.css b/fixtures/demo-app/src/style.css
+index 83a642e..be36501 100644
+--- a/fixtures/demo-app/src/style.css
++++ b/fixtures/demo-app/src/style.css
+@@ -25,7 +25,7 @@ header { height: 73px; border-bottom: 1px solid #e2e7ee; background: #fff; displ
+ .eyebrow { color: #5c79ad; font-weight: 700; font-size: 11px; letter-spacing: 1.5px; }
+ h1 { margin: 10px 0 8px; font-size: 34px; letter-spacing: -1.1px; }
+ .subhead { margin: 0 0 36px; color: #7e8aa0; font-size: 15px; }
+-.dashboard-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--surface-gap); margin-bottom: 24px; }
++.dashboard-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 24px; margin-bottom: 24px; }
+ .metric, .panel { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; box-shadow: 0 4px 20px #172d5208; }
+ .metric { min-height: 168px; padding: 26px; display: flex; flex-direction: column; }
+ .metric span { color: #78859a; font-size: 13px; }
