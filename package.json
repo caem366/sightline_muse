@@ -1,0 +1,14 @@
+{
+  "name": "sightline",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*", "fixtures/demo-app"],
+  "scripts": {
+    "dev": "npm run dev -w @sightline/server",
+    "web": "npm run dev -w @sightline/web",
+    "demo": "npm run dev -w @sightline/demo-app",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test -w @sightline/server"
+  }
+}
