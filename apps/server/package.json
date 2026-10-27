@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/*.test.ts",
     "reference": "tsx src/reference.ts",
-    "run": "tsx src/cli.ts"
+    "run": "tsx src/cli.ts",
+    "smoke": "tsx src/smoke.ts"
   },
   "dependencies": {
     "express": "^5.1.0",

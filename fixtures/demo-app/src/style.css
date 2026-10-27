@@ -56,6 +56,6 @@ h2 { font-size: 17px; margin: 0; }
   nav a { justify-content: center; }
   header { padding: 0 22px; }
   .content { padding: 35px 22px; }
-  .dashboard-grid { grid-template-columns: 1fr; }
+  .dashboard-grid { grid-template-columns: 1fr; gap: 12px; }
   .settings-fields { grid-template-columns: 1fr; }
 }
