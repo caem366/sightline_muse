@@ -21,6 +21,8 @@ npm run web
 
 Open `http://127.0.0.1:4178`. Select the Northstar project and run repair. The initial Dashboard design reference is included; the UI accepts a replacement 1440×900 PNG. The server binds to `127.0.0.1:4177` and keeps keys in its process environment.
 
+For the single-command fixture experiment, run `npm run run -w @sightline/server` after setting the key. It captures the reference and both routes, asks Muse for CSS, applies the candidate in a Git worktree, and prints the persisted verdict and diff location.
+
 To use the Baseten hackathon endpoint instead, set `BASETEN_API_KEY` and `SIGHTLINE_PROVIDER=baseten`. The default Baseten ID is `meta-models/muse-spark-open-1026`, as specified in the participant email. The exact ID, image input, and schema output still require a live credentialed probe in this environment.
 
 ## Configure another app
